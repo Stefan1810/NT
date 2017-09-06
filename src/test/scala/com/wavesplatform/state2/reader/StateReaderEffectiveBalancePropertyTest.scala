@@ -16,7 +16,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     emptyBlocksAmt <- Gen.choose(1, 10)
-    atHeight <- Gen.choose(0, 20)
+    atHeight <- Gen.choose(1, 20)
     confirmations <- Gen.choose(1, 20)
   } yield (genesis, emptyBlocksAmt, atHeight, confirmations)
 
@@ -26,7 +26,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec
       val genesisBlock = TestBlock.create(Seq(genesis))
       val nextBlocks = List.fill(emptyBlocksAmt - 1)(TestBlock.create(Seq.empty))
       assertDiffAndState(genesisBlock +: nextBlocks, TestBlock.create(Seq.empty)) { (_, newState) =>
-        newState.effectiveBalanceAtHeightWithConfirmations(genesis.recipient, atHeight, confirmations).get shouldBe genesis.amount
+        newState.effectiveBalance(genesis.recipient, atHeight, confirmations) shouldBe genesis.amount
       }
     }
   }

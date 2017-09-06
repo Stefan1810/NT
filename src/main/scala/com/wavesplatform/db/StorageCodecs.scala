@@ -219,7 +219,7 @@ object AssetInfoCodec extends Codec[AssetInfo] {
   override def encode(value: AssetInfo): Array[Byte] = {
     val result = new Array[Byte](1 + Longs.BYTES)
     System.arraycopy(encodeBoolean(value.isReissuable), 0, result, 0, 1)
-    System.arraycopy(Longs.toByteArray(value.volume), 0, result, 1, Longs.BYTES)
+    System.arraycopy(Longs.toByteArray(???), 0, result, 1, Longs.BYTES)
     result
   }
 

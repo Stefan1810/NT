@@ -33,14 +33,8 @@ object TransferTransactionDiff {
             Map(sender -> Portfolio(0, LeaseInfo.empty, Map(aid -> -tx.fee)))
         }
       )
-      assetIssued = tx.assetId match {
-        case None => true
-        case Some(aid) => state.assetInfo(aid).isDefined
-      }
-      feeAssetIssued = tx.feeAssetId match {
-        case None => true
-        case Some(aid) => state.assetInfo(aid).isDefined
-      }
+      assetIssued = tx.assetId.forall(state.assetDescription(_).isDefined)
+      feeAssetIssued = tx.feeAssetId.forall(state.assetDescription(_).isDefined)
     } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(assetIssued && feeAssetIssued))
 
     isInvalidEi match {

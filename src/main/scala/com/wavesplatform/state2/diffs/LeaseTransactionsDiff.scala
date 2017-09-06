@@ -20,9 +20,10 @@ object LeaseTransactionsDiff {
       if (recipient == sender)
         Left(GenericError("Cannot lease to self"))
       else {
-        val ap = s.partialPortfolio(tx.sender)
-        if (ap.balance - ap.leaseInfo.leaseOut < tx.amount) {
-          Left(GenericError(s"Cannot lease more than own: Balance:${ap.balance}, already leased: ${ap.leaseInfo.leaseOut}"))
+        val ap = s.wavesBalance(tx.sender)
+        val li = s.leaseInfo(tx.sender)
+        if (ap - li.leaseOut < tx.amount) {
+          Left(GenericError(s"Cannot lease more than own: Balance: $ap, already leased: ${li.leaseOut}"))
         }
         else {
           val portfolioDiff: Map[Address, Portfolio] = Map(
@@ -37,14 +38,14 @@ object LeaseTransactionsDiff {
 
   def leaseCancel(s: SnapshotStateReader, settings: FunctionalitySettings, time: Long, height: Int)
                  (tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
-    val leaseEi = s.findTransaction[LeaseTransaction](tx.leaseId) match {
+    val leaseEi = s.leaseDetails(tx.leaseId) match {
       case None => Left(GenericError(s"Related LeaseTransaction not found"))
       case Some(l) => Right(l)
     }
     for {
       lease <- leaseEi
       recipient <- s.resolveAliasEi(lease.recipient)
-      isLeaseActive = s.isLeaseActive(lease)
+      isLeaseActive = lease.isActive
       _ <- if (!isLeaseActive && time > settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
         Left(GenericError(s"Cannot cancel already cancelled lease")) else Right(())
       canceller = Address.fromPublicKey(tx.sender.publicKey)
@@ -59,7 +60,7 @@ object LeaseTransactionsDiff {
       } else Left(GenericError(s"LeaseTransaction was leased by other sender " +
         s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${settings.allowMultipleLeaseCancelTransactionUntilTimestamp}"))
 
-    } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(lease.id() -> false))
+    } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(tx.leaseId -> false))
   }
 }
 

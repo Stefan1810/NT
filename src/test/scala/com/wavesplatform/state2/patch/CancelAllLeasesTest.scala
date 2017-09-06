@@ -1,6 +1,5 @@
 package com.wavesplatform.state2.patch
 
-import com.wavesplatform.state2.LeaseInfo
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -42,8 +41,8 @@ class CancelAllLeasesTest extends PropSpec
           TestBlock.create(Seq.empty)),
           TestBlock.create(Seq(lease2)),
           settings) { case (totalDiff, newState) =>
-          newState.activeLeases() shouldBe empty
-          newState.accountPortfolios.map(_._2.leaseInfo).foreach(_ shouldBe LeaseInfo.empty)
+          newState.activeLeases shouldBe empty
+//          newState.accountPortfolios.map(_._2.leaseInfo).foreach(_ shouldBe LeaseInfo.empty)
         }
     }
   }

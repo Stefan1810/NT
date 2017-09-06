@@ -11,21 +11,21 @@ import scorex.transaction.{DiscardedMicroBlocks, Transaction}
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
-class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeatures: Set[Short]) {
+class NgState(val base: Block, val baseBlockDiff: Diff, val acceptedFeatures: Set[Short]) {
 
   private val MaxTotalDiffs = 3
 
-  private val microDiffs: MMap[BlockId, (BlockDiff, Long)] = MMap.empty
+  private val microDiffs: MMap[BlockId, (Diff, Long)] = MMap.empty
   private val micros: MList[MicroBlock] = MList.empty // fresh head
   private val totalBlockDiffCache = CacheBuilder.newBuilder()
     .maximumSize(MaxTotalDiffs)
     .expireAfterWrite(10, TimeUnit.MINUTES)
-    .build[BlockId, BlockDiff]()
+    .build[BlockId, Diff]()
 
 
   def microBlockIds: Seq[BlockId] = micros.map(_.totalResBlockSig).toList
 
-  private def diffFor(totalResBlockSig: BlockId): BlockDiff =
+  private def diffFor(totalResBlockSig: BlockId): Diff =
     if (totalResBlockSig == base.uniqueId)
       baseBlockDiff
     else Option(totalBlockDiffCache.getIfPresent(totalResBlockSig)) match {
@@ -54,10 +54,10 @@ class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeature
         transactionData = transactions)
     }
 
-  def totalDiffOf(id: BlockId): Option[(Block, BlockDiff, DiscardedMicroBlocks)] =
+  def totalDiffOf(id: BlockId): Option[(Block, Diff, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (b, txs) => (b, diffFor(id), txs) }
 
-  def bestLiquidDiff: BlockDiff = micros.headOption.map(m => totalDiffOf(m.totalResBlockSig).get._2).getOrElse(baseBlockDiff)
+  def bestLiquidDiff: Diff = micros.headOption.map(m => totalDiffOf(m.totalResBlockSig).get._2).getOrElse(baseBlockDiff)
 
   def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
@@ -93,7 +93,7 @@ class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeature
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: BlockDiff, timestamp: Long): Boolean = {
+  def append(m: MicroBlock, diff: Diff, timestamp: Long): Boolean = {
     val txsCount = base.transactionCount + micros.view.map(_.transactionData.size).sum + m.transactionData.size
     val successful = Block.areTxsFitInBlock(base.version, txsCount)
     if (successful) {

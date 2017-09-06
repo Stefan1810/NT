@@ -25,12 +25,11 @@ class PaymentTransactionDiffTest extends PropSpec
   val settings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 2)
 
   property("Diff doesn't break invariant before block version 3") {
-    forAll(preconditionsAndPayments) { case ((genesis, paymentV2, paymentV3)) =>
+    forAll(preconditionsAndPayments) { case ((genesis, paymentV2, _)) =>
       assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(paymentV2)), settings) { (blockDiff, newState) =>
-        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
-        newState.accountTransactionIds(paymentV2.sender, 2).size shouldBe 2 // genesis and payment
       }
     }
   }

@@ -4,13 +4,12 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats._
 import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
-import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
+import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import monix.eval.Task
@@ -52,9 +51,8 @@ trait UtxBatchOps {
 }
 
 class UtxPoolImpl(time: Time,
-                  stateReader: StateReader,
+                  stateReader: SnapshotStateReader,
                   history: History,
-                  featureProvider: FeatureProvider,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
@@ -66,7 +64,7 @@ class UtxPoolImpl(time: Time,
   private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val removeInvalid = Task {
-    val state = stateReader()
+    val state = stateReader
     val transactionsToRemove = transactions.values.asScala.filter(t => state.containsTransaction(t.id()))
     removeAll(transactionsToRemove)
   }.delayExecution(utxSettings.cleanupInterval)
@@ -93,7 +91,22 @@ class UtxPoolImpl(time: Time,
       }
   }
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = putIfNew(stateReader(), tx)
+  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = {
+    putRequestStats.increment()
+    measureSuccessful(processingTimeStats, {
+      val s = stateReader
+      for {
+        _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+        _ <- checkNotBlacklisted(tx)
+        _ <- feeCalculator.enoughFee(tx)
+        diff <- TransactionDiffer(fs, history.lastBlockTimestamp, time.correctedTime(), history.height)(s, history, tx)
+      } yield {
+        utxPoolSizeStats.increment()
+        pessimisticPortfolios.add(tx.id(), diff)
+        Option(transactions.put(tx.id(), tx)).isEmpty
+      }
+    })
+  }
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
     if (utxSettings.blacklistSenderAddresses.isEmpty) {
@@ -131,8 +144,11 @@ class UtxPoolImpl(time: Time,
   }
 
   override def portfolio(addr: Address): Portfolio = {
-    val base = stateReader().accountPortfolio(addr)
     val foundInUtx = pessimisticPortfolios.getAggregated(addr)
+    val base = Portfolio(
+      stateReader.wavesBalance(addr),
+      stateReader.leaseInfo(addr),
+      stateReader.assetBalance(addr))
 
     Monoid.combine(base, foundInUtx)
   }
@@ -148,14 +164,14 @@ class UtxPoolImpl(time: Time,
   override def packUnconfirmed(max: Int, sortInBlock: Boolean): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val s = stateReader()
-    val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, s.height) _
+    val s = stateReader
+    val differ = TransactionDiffer(fs, history.lastBlockTimestamp, currentTs, history.height) _
     val (invalidTxs, reversedValidTxs, _) = transactions
       .values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
         case ((invalid, valid, diff), tx) if valid.lengthCompare(max) <= 0 =>
-          differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
+          differ(composite(s, diff), history, tx) match {
             case Right(newDiff) if valid.lengthCompare(max) < 0 =>
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Right(_) =>
@@ -175,7 +191,7 @@ class UtxPoolImpl(time: Time,
     else reversedValidTxs.reverse
   }
 
-  override def batched(f: UtxBatchOps => Unit): Unit = f(new BatchOpsImpl(stateReader()))
+  override def batched(f: UtxBatchOps => Unit): Unit = f(new BatchOpsImpl(stateReader))
 
   private class BatchOpsImpl(s: SnapshotStateReader) extends UtxBatchOps {
     override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = outer.putIfNew(s, tx)
@@ -188,7 +204,7 @@ class UtxPoolImpl(time: Time,
         _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
         _ <- checkNotBlacklisted(tx)
         _ <- feeCalculator.enoughFee(tx)
-        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, featureProvider, tx)
+        diff <- TransactionDiffer(fs, history.lastBlockTimestamp, time.correctedTime(), history.height)(s, history, tx)
       } yield {
         utxPoolSizeStats.increment()
         pessimisticPortfolios.add(tx.id(), diff)

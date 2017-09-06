@@ -1,7 +1,6 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.state2._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
@@ -27,15 +26,14 @@ class AssetTransactionsDiffTest extends PropSpec
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
     forAll(issueReissueBurnTxs(isReissuable = true)) { case (((gen, issue), (reissue, burn))) =>
       assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) { case (blockDiff, newState) =>
-        val totalPortfolioDiff = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+        val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
 
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets shouldBe Map(reissue.assetId -> (reissue.quantity - burn.amount))
 
         val totalAssetVolume = issue.quantity + reissue.quantity - burn.amount
-        newState.accountPortfolio(issue.sender).assets shouldBe Map(reissue.assetId -> totalAssetVolume)
-        newState.assetInfo(issue.id()) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
+        newState.assetBalance(issue.sender) shouldBe Map(reissue.assetId -> totalAssetVolume)
       }
     }
   }
@@ -73,10 +71,10 @@ class AssetTransactionsDiffTest extends PropSpec
 
     forAll(setup) { case ((gen, issue), reissue, burn) =>
       assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
-        blockDiffEi should produce("Asset was issued by other address")
+        blockDiffEi should produce("Asset was issued by another address")
       }
       assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(burn))) { blockDiffEi =>
-        blockDiffEi should produce("Asset was issued by other address")
+        blockDiffEi should produce("Asset was issued by another address")
       }
     }
   }

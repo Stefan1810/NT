@@ -30,14 +30,14 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     scenario(preconditionsAndPayments(2)) { case (domain, (genesis, payments)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments(0)), Seq(payments(1))))
       domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
-      domain.history.height() shouldBe 1
-      domain.stateReader().height shouldBe 1
+      domain.history.height shouldBe 1
+      domain.stateReader.height shouldBe 1
       domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-      domain.history.height() shouldBe 2
-      domain.stateReader().height shouldBe 2
+      domain.history.height shouldBe 2
+      domain.stateReader.height shouldBe 2
       domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe 'right
-      domain.history.height() shouldBe 1
-      domain.stateReader().height shouldBe 1
+      domain.history.height shouldBe 1
+      domain.stateReader.height shouldBe 1
       domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
       domain.blockchainUpdater.processBlock(blocks(2)) shouldBe 'right
     }
@@ -61,7 +61,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     }
   }
 
-  property("can process 11 blocks and than rollback to genesis") {
+  property("can process 11 blocks and then rollback to genesis") {
     scenario(preconditionsAndPayments(10)) { case (domain, (genesis, payments)) =>
       val blocks = chainBlocks(Seq(genesis) +: payments.map(Seq(_)))
       blocks.foreach{ b =>

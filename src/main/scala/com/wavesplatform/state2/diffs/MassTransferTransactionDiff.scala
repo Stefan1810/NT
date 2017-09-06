@@ -32,10 +32,8 @@ object MassTransferTransactionDiff {
           case Some(aid) => Map(sender -> Portfolio(0, LeaseInfo.empty, Map(aid -> -totalAmount)))
         })
 
-      val assetIssued = tx.assetId match {
-        case None => true
-        case Some(aid) => state.assetInfo(aid).isDefined
-      }
+      val assetIssued = tx.assetId.forall(state.assetDescription(_).isDefined)
+
       Either.cond(assetIssued,
         Diff(height, tx, completePortfolio),
         GenericError(s"Attempt to transfer a nonexistent asset"))

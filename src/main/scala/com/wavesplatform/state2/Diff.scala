@@ -1,41 +1,45 @@
 package com.wavesplatform.state2
 
-import cats.Monoid
 import cats.implicits._
-import scorex.account.{Address, Alias}
+import cats.kernel.Monoid
+import scorex.account.{Address, Alias, PublicKeyAccount}
 import scorex.transaction.Transaction
 
-case class Snapshot(prevHeight: Int, balance: Long, effectiveBalance: Long)
+case class Snapshot(wavesBalance: Option[Long] = None, assetBalances: Map[ByteStr, Long] = Map.empty)
 
 case class LeaseInfo(leaseIn: Long, leaseOut: Long)
 
 object LeaseInfo {
   val empty = LeaseInfo(0, 0)
-  implicit val leaseInfoMonoid = new Monoid[LeaseInfo] {
+  implicit val leaseInfoMonoid: Monoid[LeaseInfo] = new Monoid[LeaseInfo] {
     override def empty: LeaseInfo = LeaseInfo.empty
 
-    override def combine(x: LeaseInfo, y: LeaseInfo): LeaseInfo = LeaseInfo(safeSum(x.leaseIn, y.leaseIn), safeSum(x.leaseOut, y.leaseOut))
+    override def combine(x: LeaseInfo, y: LeaseInfo): LeaseInfo =
+      LeaseInfo(safeSum(x.leaseIn, y.leaseIn), safeSum(x.leaseOut, y.leaseOut))
   }
 }
 
 case class OrderFillInfo(volume: Long, fee: Long)
 
 object OrderFillInfo {
-  implicit val orderFillInfoMonoid = new Monoid[OrderFillInfo] {
+  implicit val orderFillInfoMonoid: Monoid[OrderFillInfo] = new Monoid[OrderFillInfo] {
     override def empty: OrderFillInfo = OrderFillInfo(0, 0)
 
-    override def combine(x: OrderFillInfo, y: OrderFillInfo): OrderFillInfo = OrderFillInfo(x.volume + y.volume, x.fee + y.fee)
+    override def combine(x: OrderFillInfo, y: OrderFillInfo): OrderFillInfo =
+      OrderFillInfo(x.volume + y.volume, x.fee + y.fee)
   }
 }
 
-case class AssetInfo(isReissuable: Boolean, volume: Long)
+case class AssetDescription(issuer: PublicKeyAccount, name: Array[Byte], decimals: Int, reissuable: Boolean)
+
+case class AssetInfo(isReissuable: Boolean, volume: BigInt)
 
 object AssetInfo {
-  implicit val assetInfoMonoid = new Monoid[AssetInfo] {
+  implicit val assetInfoMonoid: Monoid[AssetInfo] = new Monoid[AssetInfo] {
     override def empty: AssetInfo = AssetInfo(isReissuable = true, 0)
 
-    override def combine(x: AssetInfo, y: AssetInfo): AssetInfo
-    = AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
+    override def combine(x: AssetInfo, y: AssetInfo): AssetInfo =
+      AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
   }
 }
 
@@ -76,10 +80,6 @@ object Diff {
     leaseState = leaseState)
 
   val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
-
-  implicit class DiffExt(d: Diff) {
-    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
-  }
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty

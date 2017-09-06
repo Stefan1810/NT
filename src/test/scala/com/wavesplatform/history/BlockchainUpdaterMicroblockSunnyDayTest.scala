@@ -133,29 +133,35 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
   property("discarding some of microBlocks doesn't affect resulting state") {
     forAll(preconditionsAndPayments, accountGen) { case ((genesis, masterToAlice, aliceToBob, aliceToBob2), miner) =>
       val ts = genesis.timestamp
-      val da = domain(MicroblocksActivatedAt0WavesSettings)
-      val block0a = customBuildBlockOfTxs(randomSig, Seq(genesis), miner, 3: Byte, ts)
-      val (block1a, microBlocks1a) = chainBaseAndMicro(block0a.uniqueId, Seq(masterToAlice), Seq(Seq(aliceToBob)), miner, 3: Byte, ts)
-      val block2a = customBuildBlockOfTxs(block1a.uniqueId, Seq(aliceToBob2), miner, 3: Byte, ts)
-      val block3a = customBuildBlockOfTxs(block2a.uniqueId, Seq.empty, miner, 3: Byte, ts)
-      da.blockchainUpdater.processBlock(block0a).explicitGet()
-      da.blockchainUpdater.processBlock(block1a).explicitGet()
-      da.blockchainUpdater.processMicroBlock(microBlocks1a(0)).explicitGet()
-      da.blockchainUpdater.processBlock(block2a).explicitGet()
-      da.blockchainUpdater.processBlock(block3a).explicitGet()
 
+      val minerABalance = withDomain(MicroblocksActivatedAt0WavesSettings) { da =>
+        val block0a = customBuildBlockOfTxs(randomSig, Seq(genesis), miner, 3: Byte, ts)
+        val (block1a, microBlocks1a) = chainBaseAndMicro(block0a.uniqueId, Seq(masterToAlice), Seq(Seq(aliceToBob)), miner, 3: Byte, ts)
+        val block2a = customBuildBlockOfTxs(block1a.uniqueId, Seq(aliceToBob2), miner, 3: Byte, ts)
+        val block3a = customBuildBlockOfTxs(block2a.uniqueId, Seq.empty, miner, 3: Byte, ts)
+        da.blockchainUpdater.processBlock(block0a).explicitGet()
+        da.blockchainUpdater.processBlock(block1a).explicitGet()
+        da.blockchainUpdater.processMicroBlock(microBlocks1a(0)).explicitGet()
+        da.blockchainUpdater.processBlock(block2a).explicitGet()
+        da.blockchainUpdater.processBlock(block3a).explicitGet()
 
-      val db = domain(MicroblocksActivatedAt0WavesSettings)
-      val block0b = customBuildBlockOfTxs(randomSig, Seq(genesis), miner, 3: Byte, ts)
-      val block1b = customBuildBlockOfTxs(block0b.uniqueId, Seq(masterToAlice), miner, 3: Byte, ts)
-      val block2b = customBuildBlockOfTxs(block1b.uniqueId, Seq(aliceToBob2), miner, 3: Byte, ts)
-      val block3b = customBuildBlockOfTxs(block2b.uniqueId, Seq.empty, miner, 3: Byte, ts)
-      db.blockchainUpdater.processBlock(block0b).explicitGet()
-      db.blockchainUpdater.processBlock(block1b).explicitGet()
-      db.blockchainUpdater.processBlock(block2b).explicitGet()
-      db.blockchainUpdater.processBlock(block3b).explicitGet()
+        da.stateReader.wavesBalance(miner)
+      }
 
-      da.stateReader().partialPortfolio(miner).balance shouldBe db.stateReader().partialPortfolio(miner).balance
+      val minerBBalance = withDomain(MicroblocksActivatedAt0WavesSettings) { db =>
+        val block0b = customBuildBlockOfTxs(randomSig, Seq(genesis), miner, 3: Byte, ts)
+        val block1b = customBuildBlockOfTxs(block0b.uniqueId, Seq(masterToAlice), miner, 3: Byte, ts)
+        val block2b = customBuildBlockOfTxs(block1b.uniqueId, Seq(aliceToBob2), miner, 3: Byte, ts)
+        val block3b = customBuildBlockOfTxs(block2b.uniqueId, Seq.empty, miner, 3: Byte, ts)
+        db.blockchainUpdater.processBlock(block0b).explicitGet()
+        db.blockchainUpdater.processBlock(block1b).explicitGet()
+        db.blockchainUpdater.processBlock(block2b).explicitGet()
+        db.blockchainUpdater.processBlock(block3b).explicitGet()
+
+        db.stateReader.wavesBalance(miner)
+      }
+
+      minerABalance shouldBe minerBBalance
     }
   }
 

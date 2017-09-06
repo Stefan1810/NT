@@ -1,11 +1,11 @@
 package com.wavesplatform.matcher.market
 
-import com.wavesplatform.{TestDB, UtxPool}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.{TestDB, UtxPool}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -30,7 +30,7 @@ class OrderValidatorSpecification extends WordSpec
   val utxPool: UtxPool = stub[UtxPool]
 
   val ss: SnapshotStateReader = stub[SnapshotStateReader]
-  (ss.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
+//  (ss.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1: IssueTransaction = IssueTransaction.create(PrivateKeyAccount(Array.empty), "WBTC".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
   (ss.transactionInfo _).when(*).returns(Some((1, Some(i1))))
 

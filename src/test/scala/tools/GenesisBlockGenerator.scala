@@ -3,7 +3,6 @@ package tools
 import java.io.{File, FileNotFoundException}
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state2._
 import net.ceedubs.ficus.Ficus._
@@ -18,7 +17,7 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 
-object GenesisBlockGenerator extends App with TransactionGen {
+object GenesisBlockGenerator extends App {
 
   private type SeedText = String
   private type Share = Long

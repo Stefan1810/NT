@@ -19,14 +19,14 @@ class GenesisTransactionDiffTest extends PropSpec with PropertyChecks with Match
 
   property("Diff establishes Waves invariant") {
     forAll(nelMax(genesisGen)) { gtxs =>
-      assertDiffAndState(Seq.empty, TestBlock.create(gtxs)) { (blockDiff, state) =>
-        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+      assertDiffAndState(Seq.empty, TestBlock.create(gtxs)) { (blockDiff, _) =>
+        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe gtxs.map(_.amount).sum
         totalPortfolioDiff.effectiveBalance shouldBe gtxs.map(_.amount).sum
         totalPortfolioDiff.assets shouldBe Map.empty
 
         gtxs.foreach { gtx =>
-          blockDiff.snapshots(gtx.recipient) shouldBe Map(1 -> Snapshot(0, gtx.amount, gtx.amount))
+          blockDiff.portfolios(gtx.recipient).balance shouldBe gtx.amount
         }
       }
     }
